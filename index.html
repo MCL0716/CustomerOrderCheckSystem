@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>客戶訂單比對系統</title>
+    <style>
+        .gray-text {
+            color: gray;
+            font-size: 8em;
+            font-weight: bold;
+        }
+        .green-text {
+            color: green;
+            font-size: 3em;
+            font-weight: bold;
+        }
+        .red-text {
+            color: red;
+            font-size: 6em;
+            font-weight: bold;
+        }
+        .yellow-text {
+            color: yellow;
+            font-size: 3em;
+            font-weight: bold;
+        }
+        .blue-text {
+            color: blue;
+            font-size: 3em;
+            font-weight: bold;
+        }
+        .large-blue-text {
+            color: blue;
+            font-size: 10em;
+            font-weight: bold;
+        }
+        .box {
+            width: 30%;
+            height: 200px;
+            border: 1px solid black;
+            margin: 10px;
+            padding: 10px;
+            overflow-y: scroll;
+            display: inline-block;
+            vertical-align: top;
+        }
+        #result {
+            margin-top: 20px;
+        }
+	#final_result {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>客戶訂單比對系統</h1>
+
+    <label for="fileInput">上傳 [客戶訂單] (*必要):</label>
+    <input type="file" id="fileInput" accept=".txt">
+    <br><br>
+
+    <label for="M1Input">上傳 [輸入貨號音檔] (非必要):</label>
+    <input type="file" id="M1Input" accept="audio/*">
+    <br><br>
+
+    <label for="M2Input">上傳 [命中貨號音檔] (非必要):</label>
+    <input type="file" id="M2Input" accept="audio/*">
+    <br><br>
+
+    <label for="numInput">輸入 [貨號]:</label>
+    <input type="text" id="numInput">
+    <button id="checkNum">比對</button>
+    <p id="result"></p>
+    <p id="final_result"></p>
+
+    <button id="downloadModifiedA" style="display: inline;">下載 [客戶訂單_更新版]</button>
+    <button id="downloadB" style="display: none;">下載 [已輸入貨號]</button>
+    <button id="downloadC" style="display: none;">下載 [已命中貨號]</button>
+
+    <br><br>
+
+    <div class="box" id="boxA"><strong>客戶訂單_更新版:</strong><br></div>
+    <div class="box" id="boxB"><strong>已輸入貨號:</strong><br></div>
+    <div class="box" id="boxC"><strong>已命中貨號:</strong><br></div>
+
+    <script>
+        let userEntries = [];
+        let bEntries = [];
+        let cEntries = [];
+        let inputCount = 0; // 記錄輸入次數
+        let M1Sound = null;
+        let M2Sound = null;
+
+        // 讀取A.txt的上傳文件
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                userEntries = e.target.result.split('\n').map(entry => entry.trim()).filter(entry => entry !== "");
+                alert('[客戶訂單] 已上傳');
+                updateBoxA();
+                toggleDownloadButton(); // 更新下載按鈕狀態
+            };
+            reader.readAsText(file);
+        });
+
+        // 上傳M1音效文件
+        document.getElementById('M1Input').addEventListener('change', function(event) {
+            M1Sound = URL.createObjectURL(event.target.files[0]);
+            alert('[輸入貨號音檔] 已上傳');
+        });
+
+        // 上傳M2音效文件
+        document.getElementById('M2Input').addEventListener('change', function(event) {
+            M2Sound = URL.createObjectURL(event.target.files[0]);
+            alert('[命中貨號音檔] 已上傳');
+        });
+
+        // 播放音效
+        function playSound(soundFile) {
+            if (!soundFile) return; // 如果沒有上傳音效文件，不播放音效
+            let audio = new Audio(soundFile);
+            audio.play();
+        }
+
+        // 檢查USER_NUM
+		function checkNum() {
+			inputCount++; // 增加輸入次數
+			let inputNum = document.getElementById('numInput').value.trim().replace(/\s+/g, '').toLowerCase(); // 忽略大小寫，去除空格
+			const resultElement = document.getElementById('result');
+			resultElement.innerHTML = '';
+			const final_resultElement = document.getElementById('final_result');
+			final_resultElement.innerHTML = '';
+
+			// 清空輸入欄位
+			document.getElementById('numInput').value = '';
+
+			if (inputNum === '') {
+				return;
+			}
+
+			const countDisplay = `<span class="gray-text">#${inputCount}</span><br>`;
+
+			// 檢查A.txt中的USER_NUM，忽略大小寫，去除空格
+			const matchedIndex = userEntries.findIndex(entry => entry.split(':')[1].replace(/\s+/g, '').toLowerCase() === inputNum);
+			if (matchedIndex !== -1) {
+				// USER_NUM存在於A.txt
+				const userNameNum = userEntries[matchedIndex]; // USER_NAME:USER_NUM
+				cEntries.unshift(userNameNum); // 插入到C.txt首行
+				userEntries.splice(matchedIndex, 1); // 從A.txt移除該行
+				resultElement.innerHTML = `${countDisplay}<span class="red-text">${userNameNum}</span> - 命中客戶訂單 - 插入資料於 [已命中貨號]`;
+				playSound(M2Sound); // 播放M2音效
+				updateBoxA();
+				updateBoxC();
+			} else {
+				// USER_NUM不存在於A.txt，插入到B.txt首行
+				bEntries.unshift(inputNum); // 插入到B.txt首行
+				resultElement.innerHTML = `${countDisplay}<span class="green-text">${inputNum}</span> - 未命中客戶訂單 - 插入資料於 [已輸入貨號]`;
+				playSound(M1Sound); // 播放M1音效
+				updateBoxB();
+			}
+
+			// 更新下載按鈕的顯示
+			toggleDownloadButton();
+
+			// 檢查A.txt是否已空
+			if (userEntries.length === 0) {
+				document.getElementById('numInput').style.display = 'none'; // 隱藏輸入框
+				document.getElementById('checkNum').style.display = 'none'; // 隱藏ENTER按鈕
+				final_resultElement.innerHTML = `<span class="large-blue-text">已完成客戶訂單比對</span>`;
+			}
+		}
+
+
+        // 更新下載按鈕的顯示
+        function toggleDownloadButton() {
+            document.getElementById('downloadB').style.display = 'inline';
+            document.getElementById('downloadC').style.display = 'inline';
+            // document.getElementById('downloadModifiedA').style.display = userEntries.length > 0 ? 'inline' : 'none';
+        }
+
+        // 監聽按鈕點擊
+		document.getElementById('checkNum').addEventListener('click', checkNum);
+
+		// 監聽輸入欄位中的ENTER鍵
+		document.getElementById('numInput').addEventListener('keyup', function(event) {
+			if (event.key === 'Enter') {
+				checkNum();
+			}
+		});
+
+        // 下載修改後的A.txt
+        document.getElementById('downloadModifiedA').addEventListener('click', function() {
+            const modifiedAContent = userEntries.join('\n');
+            downloadFile(modifiedAContent, '客戶訂單_更新版.txt');
+        });
+
+        // 下載B.txt
+        document.getElementById('downloadB').addEventListener('click', function() {
+            const bContent = bEntries.join('\n');
+            downloadFile(bContent, '已輸入貨號.txt');
+        });
+
+        // 下載C.txt
+        document.getElementById('downloadC').addEventListener('click', function() {
+            const cContent = cEntries.join('\n');
+            downloadFile(cContent, '已命中貨號.txt');
+        });
+
+
+        // 下載文件
+        function downloadFile(content, fileName) {
+            const blob = new Blob([content], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            link.click();
+        }
+
+        // 更新A.txt顯示框
+        function updateBoxA() {
+            const boxA = document.getElementById('boxA');
+            boxA.innerHTML = `<strong>客戶訂單_更新版:</strong><br>${userEntries.join('<br>')}`;
+        }
+
+        // 更新B.txt顯示框
+        function updateBoxB() {
+            const boxB = document.getElementById('boxB');
+            boxB.innerHTML = `<strong>已輸入貨號:</strong><br>${bEntries.join('<br>')}`;
+        }
+
+        // 更新C.txt顯示框
+        function updateBoxC() {
+            const boxC = document.getElementById('boxC');
+            boxC.innerHTML = `<strong>已命中貨號:</strong><br>${cEntries.join('<br>')}`;
+        }
+    </script>
+</body>
+</html>
