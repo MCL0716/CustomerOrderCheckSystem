@@ -65,7 +65,8 @@
 
     function checkNum() {
       inputCount++;
-      let inputNum = document.getElementById('numInput').value.trim().replace(/\s+/g, '').toLowerCase();
+      // let inputNum = document.getElementById('numInput').value.trim().replace(/\s+/g, '').toLowerCase();
+      let inputNum = document.getElementById('numInput').value.trim().replace(/\s+/g, '').toLowerCase().slice(0, 13);
       document.getElementById('numInput').value = '';
       const resultElement = document.getElementById('result');
       const finalElement = document.getElementById('final_result');
@@ -74,7 +75,8 @@
       if (!inputNum) return;
 
       const countDisplay = `<span class="gray-text">#${inputCount}</span><br>`;
-      const matchedIndex = userEntries.findIndex(e => e.split(':')[1]?.replace(/\s+/g, '').toLowerCase() === inputNum);
+      // const matchedIndex = userEntries.findIndex(e => e.split(':')[1]?.replace(/\s+/g, '').toLowerCase() === inputNum);
+      const matchedIndex = userEntries.findIndex( e => e.split(':')[1]?.replace(/\s+/g, '').toLowerCase().slice(0, 13) === inputNum);
 
       if (matchedIndex !== -1) {
         const hit = userEntries[matchedIndex];
