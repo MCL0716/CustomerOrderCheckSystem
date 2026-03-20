@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>客戶訂單比對系統</title>
+  <style>
+    body {
+      font-family: Arial, "Microsoft JhengHei", sans-serif;
+      margin: 20px;
+      background: #f5f5f5;
+      color: #222;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+    }
+
+    .section {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    label {
+      font-weight: bold;
+    }
+
+    input[type="text"] {
+      padding: 8px 10px;
+      font-size: 18px;
+      min-width: 280px;
+    }
+
+    button {
+      padding: 8px 14px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      background: #1976d2;
+      color: #fff;
+    }
+
+    button:hover {
+      opacity: 0.92;
+    }
+
+    button:disabled {
+      background: #999;
+      cursor: not-allowed;
+    }
+
+    .download-btn {
+      background: #2e7d32;
+    }
+
+    .file-name {
+      font-size: 16px;
+      color: #333;
+      word-break: break-all;
+    }
+
+    .box-title {
+      font-weight: bold;
+      margin-bottom: 8px;
+      font-size: 18px;
+    }
+
+    .boxes-row {
+      display: flex;
+      gap: 20px;
+      align-items: stretch;
+    }
+
+    .box-section {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .box {
+      min-height: 350px;
+      max-height: 500px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      padding: 12px;
+      background: #fafafa;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      line-height: 1.6;
+      font-size: 16px;
+    }
+
+    .gray-text {
+      color: #666;
+      font-size: 36px;
+      font-weight: bold;
+    }
+
+    .green-text {
+      color: #1b8f2e;
+      font-size: 48px;
+      font-weight: bold;
+    }
+
+    .red-text {
+      color: #d32f2f;
+      font-size: 48px;
+      font-weight: bold;
+    }
+
+    .large-blue-text {
+      color: #1565c0;
+      font-size: 56px;
+      font-weight: bold;
+    }
+
+    #result, #final_result {
+      margin-top: 15px;
+      line-height: 1.6;
+    }
+
+    .hint {
+      color: #666;
+      font-size: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .boxes-row {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>客戶訂單比對系統</h1>
+
+  <div class="section">
+    <div class="row">
+      <label>選擇 [客戶訂單] (*必要):</label>
+      <button type="button" onclick="openOrderFile()">選擇檔案</button>
+      <span id="selectedFileName" class="file-name">尚未選擇檔案</span>
+    </div>
+    <div class="hint">
+      此模式需使用 Chrome / Edge，且命中後會直接回寫原始 order.txt。
+    </div>
+  </div>
+
+  <div class="section" id="inputSection">
+    <div class="row">
+      <label for="numInput">輸入 [貨號]:</label>
+      <input type="text" id="numInput" placeholder="請輸入貨號">
+      <button id="checkNum" type="button" onclick="checkNum()">比對</button>
+    </div>
+    <div class="hint">
+      比對規則：只比對 `:` 右側資料的前 13 碼。
+    </div>
+    <div id="result"></div>
+    <div id="final_result"></div>
+  </div>
+
+  <div class="section">
+    <div class="row">
+      <button id="downloadA" class="download-btn" type="button" onclick="downloadFile('A')">下載 [客戶訂單_更新版]</button>
+      <button id="downloadB" class="download-btn" type="button" onclick="downloadFile('B')">下載 [已輸入貨號]</button>
+      <button id="downloadC" class="download-btn" type="button" onclick="downloadFile('C')">下載 [已命中貨號]</button>
+    </div>
+  </div>
+
+  <div class="boxes-row">
+    <div class="section box-section">
+      <div class="box-title">客戶訂單_更新版:</div>
+      <div id="boxA" class="box"></div>
+    </div>
+
+    <div class="section box-section">
+      <div class="box-title">已輸入貨號:</div>
+      <div id="boxB" class="box"></div>
+    </div>
+
+    <div class="section box-section">
+      <div class="box-title">已命中貨號:</div>
+      <div id="boxC" class="box"></div>
+    </div>
+  </div>
+
+  <audio id="M1Sound" src="M1.mp4" preload="auto"></audio>
+  <audio id="M2Sound" src="M2.mp4" preload="auto"></audio>
+
+  <script>
+    let orderFileHandle = null;
+    let userEntries = [];
+    let bEntries = [];
+    let cEntries = [];
+    let inputCount = 0;
+
+    const M1Sound = document.getElementById('M1Sound');
+    const M2Sound = document.getElementById('M2Sound');
+
+    // 將字串標準化後只取前13碼
+    function normalize13(str) {
+      return (str || '')
+        .trim()
+        .replace(/\s+/g, '')
+        .toLowerCase()
+        .slice(0, 13);
+    }
+
+    function playSound(audio) {
+      if (!audio) return;
+      audio.currentTime = 0;
+      audio.play().catch(err => {
+        console.warn('播放音效失敗:', err);
+      });
+    }
+
+    function updateBoxA() {
+      document.getElementById('boxA').textContent = userEntries.join('\n');
+    }
+
+    function updateBoxB() {
+      document.getElementById('boxB').textContent = bEntries.join('\n');
+    }
+
+    function updateBoxC() {
+      document.getElementById('boxC').textContent = cEntries.join('\n');
+    }
+
+    function toggleDownloadButton() {
+      document.getElementById('downloadA').disabled = userEntries.length === 0;
+      document.getElementById('downloadB').disabled = bEntries.length === 0;
+      document.getElementById('downloadC').disabled = cEntries.length === 0;
+    }
+
+    async function openOrderFile() {
+      try {
+        if (!window.showOpenFilePicker) {
+          alert('此瀏覽器不支援直接回寫檔案，請使用 Chrome 或 Edge。');
+          return;
+        }
+
+        [orderFileHandle] = await window.showOpenFilePicker({
+          types: [
+            {
+              description: 'Text Files',
+              accept: {
+                'text/plain': ['.txt']
+              }
+            }
+          ],
+          multiple: false
+        });
+
+        const file = await orderFileHandle.getFile();
+        const text = await file.text();
+
+        userEntries = text
+          .split(/\r?\n/)
+          .map(line => line.trim())
+          .filter(line => line !== '');
+
+        bEntries = [];
+        cEntries = [];
+        inputCount = 0;
+
+        document.getElementById('selectedFileName').textContent = file.name;
+        document.getElementById('result').innerHTML = '';
+        document.getElementById('final_result').innerHTML = '';
+
+        document.getElementById('numInput').value = '';
+        document.getElementById('numInput').style.display = '';
+        document.getElementById('checkNum').style.display = '';
+
+        updateBoxA();
+        updateBoxB();
+        updateBoxC();
+        toggleDownloadButton();
+      } catch (err) {
+        console.error('選擇檔案失敗:', err);
+      }
+    }
+
+    async function saveOrderFile() {
+      try {
+        if (!orderFileHandle) return;
+
+        const writable = await orderFileHandle.createWritable();
+        await writable.write(userEntries.join('\n'));
+        await writable.close();
+      } catch (err) {
+        console.error('回寫原始檔失敗:', err);
+        alert('回寫原始檔失敗，請確認瀏覽器權限是否允許。');
+      }
+    }
+
+    function downloadFile(type) {
+      let content = '';
+      let filename = '';
+
+      if (type === 'A') {
+        content = userEntries.join('\n');
+        filename = '客戶訂單_更新版.txt';
+      } else if (type === 'B') {
+        content = bEntries.join('\n');
+        filename = '已輸入貨號.txt';
+      } else if (type === 'C') {
+        content = cEntries.join('\n');
+        filename = '已命中貨號.txt';
+      }
+
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+
+      URL.revokeObjectURL(url);
+    }
+
+    async function checkNum() {
+      if (!orderFileHandle) {
+        alert('請先選擇 [客戶訂單] 檔案。');
+        return;
+      }
+
+      let inputNum = document.getElementById('numInput').value;
+      inputNum = normalize13(inputNum);
+
+      document.getElementById('numInput').value = '';
+
+      if (!inputNum) return;
+
+      inputCount++;
+
+      const resultElement = document.getElementById('result');
+      const finalElement = document.getElementById('final_result');
+
+      resultElement.innerHTML = '';
+      finalElement.innerHTML = '';
+
+      const countDisplay = `<span class="gray-text">#${inputCount}</span><br>`;
+
+      const matchedIndex = userEntries.findIndex(entry => {
+        const rightPart = entry.split(':')[1] || '';
+        return normalize13(rightPart) === inputNum;
+      });
+
+      // 每次輸入都記錄到 已輸入貨號
+      bEntries.unshift(inputNum);
+      updateBoxB();
+
+      if (matchedIndex !== -1) {
+        const hit = userEntries[matchedIndex];
+
+        // 命中後從來源清單移除
+        userEntries.splice(matchedIndex, 1);
+
+        // 加到已命中清單
+        cEntries.unshift(hit);
+
+        resultElement.innerHTML =
+          `${countDisplay}<span class="red-text">${hit}</span> - 命中客戶訂單 - 已自動從來源檔移除`;
+
+        playSound(M2Sound);
+
+        updateBoxA();
+        updateBoxC();
+
+        // 同步回寫原始 order.txt
+        await saveOrderFile();
+      } else {
+        resultElement.innerHTML =
+          `${countDisplay}<span class="green-text">${inputNum}</span> - 未命中客戶訂單`;
+
+        playSound(M1Sound);
+      }
+
+      toggleDownloadButton();
+
+      if (userEntries.length === 0) {
+        document.getElementById('numInput').style.display = 'none';
+        document.getElementById('checkNum').style.display = 'none';
+        finalElement.innerHTML = `<span class="large-blue-text">已完成客戶訂單比對</span>`;
+      }
+    }
+
+    document.getElementById('numInput').addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        checkNum();
+      }
+    });
+
+    toggleDownloadButton();
+  </script>
+</body>
+</html>
